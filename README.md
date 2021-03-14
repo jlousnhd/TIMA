@@ -5,10 +5,10 @@ Node.js, MongoDB, Express.js and React.js.
 
 Running Instructions
 --------------------
-Ensure that Express.js, React.js and MongoDB are installed in the current
-directory:
+Ensure that Express.js, React.js and MongoDB and the WebSocket library are
+installed in the current directory:
 
-    npm install express react mongodb
+    npm install express react mongodb ws
 
 Next, run the app:
 
