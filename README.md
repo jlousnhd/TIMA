@@ -15,4 +15,5 @@ Next, run the app:
     node tima.js [database]
 
 [database] is an optional argument with a database server host and port.  It
-defaults to "localhost:27017". 
+defaults to "localhost:27017".  The app is accessible on the localhost at port
+80.
