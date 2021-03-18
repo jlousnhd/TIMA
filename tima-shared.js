@@ -3,7 +3,7 @@
     // User constructor
     exports.User = function(args) {
 
-        if(typeof args.username !== "string")
+        if(typeof args.username !== "string" || !args.username)
             throw "No username string provided";
 
         if(typeof args.admin !== "boolean")
@@ -15,7 +15,7 @@
         if(typeof args.password !== "string")
             throw "No password string provided";
 
-        if(!Array.isArray(args.contacts))
+        if(!Array.isArray(args.contacts) && !(args.contacts instanceof Set))
             throw "No contacts array provided";
 
         for(const contact of args.contacts)
@@ -38,7 +38,7 @@
         if(typeof args.id !== "number")
             throw "No ID number provided";
 
-        if(typeof args.name !== "string" || typeof args.name !== "undefined" || args.name != null)
+        if(typeof args.name !== "string" && typeof args.name !== "undefined" && args.name != null)
             throw "Name provided is not a string";
 
         if(!Array.isArray(args.users))
@@ -112,6 +112,18 @@
             disabled: this.disabled,
             password: "",
             contacts: []
+        });
+
+    };
+
+    exports.User.prototype.asDisabled = function() {
+
+        return new User({
+            username: this.username,
+            admin: this.admin,
+            disabled: true,
+            password: this.password,
+            contacts: this.contacts
         });
 
     };

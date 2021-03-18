@@ -1,0 +1,446 @@
+<html>
+<head><title>TIMA</title></head>
+<script type="text/javascript">
+
+    var loggedIn = false;
+    var ws;
+
+    var divLoggedIn, divLoggedOut;
+    var inputUsername, inputPassword, inputAdmin;
+    var inputUserSearch, userResults;
+    var contactBox;
+    var convoBox;
+    var messageDiv;
+    var messageInput;
+    var statusArea;
+
+    function escapeHtml(string) {
+        return string
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+     }
+
+    function escapeRegex(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function pad2(number) {
+        return (number < 10) ? ("0" + number.toString()) : number.toString();
+    }
+
+    function updateVisibility() {
+
+        messageDiv.innerHTML = "";
+
+        if(loggedIn) {
+
+            divLoggedOut.style.display = "none";
+            divLoggedIn.style.display = "block";
+
+        } else {
+
+            divLoggedOut.style.display = "block";
+            divLoggedIn.style.display = "none";
+
+        }
+
+    }
+
+    function login() {
+
+        let username = inputUsername.value;
+        let password = inputPassword.value;
+
+        sendMessage({
+            type: "Login",
+            username: username,
+            password: password
+        });
+
+    }
+
+    function register() {
+
+        let username = inputUsername.value;
+        let password = inputPassword.value;
+        let admin = inputAdmin.checked;
+
+        sendMessage({
+            type: "AddUser",
+            username: username,
+            password: password,
+            admin: admin
+        });
+
+    }
+
+    function logout() {
+
+        sendMessage({
+            type: "Logout"
+        });
+
+    }
+
+    function userSearch() {
+
+        const search = escapeRegex(inputUserSearch.value);
+
+        sendMessage({
+            type: "GetUsers",
+            regex: search
+        });
+
+    }
+
+    function addContact() {
+
+        const user = userResults.value;
+
+        if(user)
+            sendMessage({
+                type: "AddContact",
+                username: user
+            });
+
+    }
+
+    function disableUser() {
+
+        const user = userResults.value;
+
+        if(user)
+            sendMessage({
+                type: "DisableUser",
+                username: user
+            });
+
+    }
+
+    function deleteContact() {
+
+        const contact = contactBox.value;
+
+        if(contact)
+            sendMessage({
+                type: "DeleteContact",
+                username: contact
+            });
+
+    }
+
+    function newConversation() {
+
+        const selected = document.querySelectorAll('#contacts option:checked');
+        const users = Array.from(selected).map(el => el.value);
+
+        sendMessage({
+            type: "NewConversation",
+            users: users
+        });
+
+    }
+
+    function deleteConversation() {
+
+        const index = convoBox.selectedIndex;
+
+        if(index < 0 || index >= conversations.length)
+            return;
+
+        const id = conversations[index].id;
+
+        sendMessage({
+            type: "DeleteConversation",
+            id: id
+        });
+
+    }
+
+    var selectedConvo = null;
+
+    function getMessages() {
+
+        messageDiv.innerHTML = "";
+        selectedConvo = null;
+
+        const index = convoBox.selectedIndex;
+
+        if(index < 0 || index >= conversations.length)
+            return;
+
+        selectedConvo = conversations[index];
+
+        sendMessage({
+            type: "GetMessages",
+            cid: selectedConvo.id
+        });
+
+    }
+
+    function send() {
+
+        if(!selectedConvo) {
+
+            statusUpdate("Select a converation to send a message");
+            return;
+
+        }
+
+        const text = messageInput.value;
+
+        sendMessage({
+            type: "SendMessage",
+            cid: selectedConvo.id,
+            text: text
+        });
+
+    }
+
+    function statusUpdate(text) {
+
+        statusArea.value += "\n" + text;
+        statusArea.scrollTop = statusArea.scrollHeight;
+
+    }
+
+    function startup() {
+
+        divLoggedOut = document.getElementById("div-logged-out");
+        divLoggedIn = document.getElementById("div-logged-in");
+
+        inputUsername = document.getElementById("input-username");
+        inputPassword = document.getElementById("input-password");
+        inputAdmin = document.getElementById("input-admin");
+
+        statusArea = document.getElementById("textarea-status");
+        statusArea.value = "";
+
+        inputUserSearch = document.getElementById("input-user-search");
+        userResults = document.getElementById("user-results");
+
+        contactBox = document.getElementById("contacts");
+        convoBox = document.getElementById("convo-box");
+
+        messageDiv = document.getElementById("message-div");
+        messageInput = document.getElementById("message-input");
+
+        let url = "ws://" + window.location.hostname + window.location.pathname;
+        ws = new WebSocket(url);
+
+        statusUpdate("Connecting to " + url + "...");
+
+        ws.onmessage = (event) => {
+            processMessage(event.data);
+        };
+
+    }
+
+    function onLoggedIn() {
+
+        loggedIn = true;
+        updateVisibility();
+
+    }
+
+    function onLoggedOut() {
+
+        loggedIn = false;
+        updateVisibility();
+
+    }
+
+    function onUserResults(users) {
+
+        // Clear user results box
+        let i;
+        for(i = userResults.options.length - 1; i >= 0; --i) {
+            userResults.remove(i);
+        }
+
+        // Add new results to box
+        for(const user of users) {
+
+            const option = document.createElement("option");
+            option.textContent = user;
+            option.value = user;
+            userResults.append(option);
+
+        }
+
+    }
+
+    function onContactList(contacts) {
+
+        // Clear contact box
+        let i;
+        for(i = contactBox.options.length - 1; i >= 0; --i) {
+            contactBox.remove(i);
+        }
+
+        // Add new results to box
+        for(const user of contacts) {
+
+            const option = document.createElement("option");
+            option.textContent = user;
+            option.value = user;
+            contactBox.append(option);
+
+        }
+
+    }
+
+    var conversations = [];
+    function onConversationList() {
+
+        // Clear convo box
+        let i;
+        for(i = convoBox.options.length - 1; i >= 0; --i) {
+            convoBox.remove(i);
+        }
+
+        // Add new results to box
+        for(const convo of conversations) {
+
+            const option = document.createElement("option");
+            option.textContent = convo.name ? convo.name : convo.users;
+            option.value = convo.name ? convo.name : convo.users;
+            convoBox.append(option);
+
+        }
+
+    }
+
+    function onMessageList(messages, cid) {
+
+        if(selectedConvo.id != cid)
+            return;
+
+        messageDiv.innerHTML = "";
+
+        for(const message of messages) {
+
+            var text = document.createElement("p");
+            messageDiv.appendChild(text);
+
+            const date = new Date(message.timestamp);
+
+            text.innerHTML = "<b>" +
+                date.getFullYear() + "-" + pad2(date.getMonth() + 1) + "-" + pad2(date.getDate()) + " " +
+                pad2(date.getHours()) + ":" + pad2(date.getMinutes()) + ":" + pad2(date.getSeconds()) + " " +
+                escapeHtml(message.user) + ": </b>" +
+                escapeHtml(message.text);
+
+        }
+
+    }
+
+    function sendMessage(message) {
+
+        message = JSON.stringify(message);
+        ws.send(message);
+
+    }
+
+    function processMessage(message) {
+
+        message = JSON.parse(message);
+
+        if(typeof(message) === "string") {
+
+            statusUpdate(message);
+
+            if(message === "Logged in")
+                onLoggedIn();
+
+            if(message === "Logged out")
+                onLoggedOut();
+
+        } else {
+
+            switch(message.type) {
+
+                case "ConversationList":
+                    conversations = message.conversations;
+                    onConversationList();
+                    break;
+
+                case "MessageList":
+                    onMessageList(message.messages, message.cid);
+                    break;
+
+                case "ContactList":
+                    onContactList(message.contacts);
+                    break;
+
+                case "UserList":
+                    onUserResults(message.users);
+                    break;
+
+            }
+
+        }
+
+    }
+
+</script>
+<body onload="startup();">
+    <h1>TIMA</h1>
+    <div id="div-logged-out">
+        <div>Username: <input id="input-username"></input></div>
+        <div>Password: <input id="input-password" type="password"></input></div>
+        <div>
+            <input type="button" onclick="login();" value="Login"></input>
+            <input type="button" onclick="register();" value="Register"></input>
+            <input type="checkbox" id="input-admin">Admin</input>
+        </div>
+    </div>
+    <div id="div-logged-in" style="display: none;">
+        <table style="height: 75%; width: 90%;">
+            <tr>
+                <th><h2>Users</h2></th>
+                <th><h2>Contacts</h2></th>
+                <th><h2>Conversations</h2></th>
+                <th><h2>Messages</h2></th>
+            </tr>
+            <tr>
+                <td> <!-- Users -->
+                    <input id="input-user-search"></input>
+                    <input type="button" onclick="userSearch();" value="Search"></input>
+                    <br>
+                    Results:
+                    <br>
+                    <select id="user-results" style="width: 100%;" size="20"></select>
+                    <br>
+                    <input type="button" value="Add Contact" onclick="addContact();"></input>
+                    <input type="button" value="Disable User" onclick="disableUser();"></input>
+                </td>
+                <td> <!-- Contacts -->
+                    <select id="contacts" style="width: 100%;" size="20" multiple></select>
+                    <br>
+                    <input type="button" value="Delete Contact" onclick="deleteContact();"></input>
+                    <input type="button" value="Start Conversation" onclick="newConversation();"></input>
+                </td>
+                <td> <!-- Conversations -->
+                    <select id="convo-box" style="width: 100%;" size="20" onchange="getMessages();"></select>
+                    <input type="button" value="Delete Conversation" onclick="deleteConversation();"></input>
+                </td>
+                <td> <!-- Messages -->
+                    <div id="message-div" style="overflow-y: scroll; height: 80%;"></div><br>
+                    <input type="text" id="message-input"></input>
+                    <input type="button" onclick="send();" value="Send"></input>
+                </td>
+            </tr>
+        </table>
+        <input type="button" onclick="logout();" value="Log Out"></input>
+    </div>
+    <div>
+        <hr>
+        <div>Status</div>
+        <div><textarea id="textarea-status" rows="4" cols="80"></textarea></div>
+    </div>
+</body>
+</html>

@@ -1,11 +1,8 @@
-const express = require('express');
-const app = express();
-const port = 3000;
+const tima = require("./tima-server");
 
-app.get('/', (req, res) => {
-    res.send('Hello World!');
-})
+let dbhost = "localhost:27017";
 
-app.listen(port, () => {
-    console.log(`Example app listening at http://localhost:${port}`);
-})
+if(process.argv.length >= 3)
+    dbhost = process.argv[2];
+
+tima.initializeServer(80, "mongodb://" + dbhost + "/tima");
